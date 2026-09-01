@@ -1,0 +1,6 @@
+[package]
+name = "emojiseq"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Strict-by-default validator for emoji codepoint sequences"
