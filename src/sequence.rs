@@ -227,3 +227,155 @@ fn validate_general_sequence(cps: &[u32], lenient: bool) -> Result<(), String> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const WAVING_HAND: u32 = 0x1F44B;
+    const WOMAN: u32 = 0x1F469;
+    const LAPTOP: u32 = 0x1F4BB;
+    const THUMBS_UP: u32 = 0x1F44D;
+    const HEART: u32 = 0x2764;
+    const REGIONAL_U: u32 = 0x1F1FA;
+    const REGIONAL_S: u32 = 0x1F1F8;
+
+    #[test]
+    fn rejects_empty_sequence() {
+        assert!(validate(&[], false).is_err());
+    }
+
+    #[test]
+    fn rejects_unrelated_codepoint() {
+        let err = validate(&[b'A' as u32], false).unwrap_err();
+        assert!(err.contains("not a recognized"));
+    }
+
+    #[test]
+    fn accepts_single_emoji() {
+        assert!(validate(&[WAVING_HAND], false).is_ok());
+    }
+
+    #[test]
+    fn accepts_zwj_sequence() {
+        assert!(validate(&[WOMAN, ZWJ, LAPTOP], false).is_ok());
+    }
+
+    #[test]
+    fn rejects_leading_joiner() {
+        let err = validate(&[ZWJ, WAVING_HAND], false).unwrap_err();
+        assert!(err.contains("cannot start"));
+    }
+
+    #[test]
+    fn rejects_trailing_joiner() {
+        let err = validate(&[WAVING_HAND, ZWJ], false).unwrap_err();
+        assert!(err.contains("cannot end with a joiner"));
+    }
+
+    #[test]
+    fn rejects_doubled_joiner() {
+        let err = validate(&[WOMAN, ZWJ, ZWJ, LAPTOP], false).unwrap_err();
+        assert!(err.contains("two joiners in a row"));
+    }
+
+    #[test]
+    fn strict_rejects_skin_tone_on_non_modifier_base() {
+        let err = validate(&[HEART, 0x1F3FB], false).unwrap_err();
+        assert!(err.contains("not a modifier base"));
+    }
+
+    #[test]
+    fn lenient_allows_skin_tone_on_non_modifier_base() {
+        assert!(validate(&[HEART, 0x1F3FB], true).is_ok());
+    }
+
+    #[test]
+    fn accepts_skin_tone_on_modifier_base() {
+        assert!(validate(&[THUMBS_UP, 0x1F3FB], false).is_ok());
+    }
+
+    #[test]
+    fn rejects_doubled_skin_tone_modifier() {
+        let err = validate(&[THUMBS_UP, 0x1F3FB, 0x1F3FC], false).unwrap_err();
+        assert!(err.contains("two skin tone modifiers"));
+    }
+
+    #[test]
+    fn rejects_skin_tone_modifier_after_joiner() {
+        let err = validate(&[WOMAN, ZWJ, 0x1F3FB], false).unwrap_err();
+        assert!(err.contains("cannot immediately follow a joiner"));
+    }
+
+    #[test]
+    fn accepts_two_letter_flag() {
+        assert!(validate(&[REGIONAL_U, REGIONAL_S], false).is_ok());
+    }
+
+    #[test]
+    fn strict_rejects_odd_regional_indicator_count() {
+        let err = validate(&[REGIONAL_U, REGIONAL_S, REGIONAL_U], false).unwrap_err();
+        assert!(err.contains("must come in pairs"));
+    }
+
+    #[test]
+    fn strict_rejects_more_than_two_regional_indicators() {
+        let err = validate(&[REGIONAL_U, REGIONAL_S, REGIONAL_U, REGIONAL_S], false).unwrap_err();
+        assert!(err.contains("expected exactly 2"));
+    }
+
+    #[test]
+    fn lenient_allows_regional_indicator_run() {
+        assert!(validate(&[REGIONAL_U, REGIONAL_S, REGIONAL_U, REGIONAL_S], true).is_ok());
+    }
+
+    #[test]
+    fn rejects_regional_indicator_mixed_with_other_emoji() {
+        let err = validate(&[REGIONAL_U, WAVING_HAND], false).unwrap_err();
+        assert!(err.contains("cannot be combined"));
+    }
+
+    #[test]
+    fn accepts_full_keycap_sequence() {
+        assert!(validate(&[b'1' as u32, VS16, KEYCAP], false).is_ok());
+    }
+
+    #[test]
+    fn strict_rejects_keycap_missing_variation_selector() {
+        assert!(validate(&[b'1' as u32, KEYCAP], false).is_err());
+    }
+
+    #[test]
+    fn lenient_allows_keycap_missing_variation_selector() {
+        assert!(validate(&[b'1' as u32, KEYCAP], true).is_ok());
+    }
+
+    #[test]
+    fn accepts_full_tag_sequence() {
+        // "GB" flag tag sequence, black flag + tag letters g,b + cancel tag.
+        let seq = [
+            BLACK_FLAG,
+            0xE0067,
+            0xE0062,
+            CANCEL_TAG,
+        ];
+        assert!(validate(&seq, false).is_ok());
+    }
+
+    #[test]
+    fn strict_rejects_tag_sequence_without_cancel_tag() {
+        let seq = [BLACK_FLAG, 0xE0067, 0xE0062];
+        assert!(validate(&seq, false).is_err());
+    }
+
+    #[test]
+    fn lenient_allows_tag_sequence_without_cancel_tag() {
+        let seq = [BLACK_FLAG, 0xE0067, 0xE0062];
+        assert!(validate(&seq, true).is_ok());
+    }
+
+    #[test]
+    fn accepts_lone_black_flag_as_ordinary_emoji() {
+        assert!(validate(&[BLACK_FLAG], false).is_ok());
+    }
+}
