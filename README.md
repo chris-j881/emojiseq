@@ -20,10 +20,11 @@ structurally sound, so you can catch that before it ships.
 
 ## Input format
 
-One sequence per line, written as whitespace-separated hex codepoints (an
-optional `U+` prefix is accepted). Anything after `;` or `#` is a comment.
-This mirrors how Unicode's own `emoji-sequences.txt` / `emoji-zwj-sequences.txt`
-files list codepoints, so you can paste directly from there.
+By default (`--format hex`), one sequence per line, written as
+whitespace-separated hex codepoints (an optional `U+` prefix is accepted).
+Anything after `;` or `#` is a comment. This mirrors how Unicode's own
+`emoji-sequences.txt` / `emoji-zwj-sequences.txt` files list codepoints, so
+you can paste directly from there.
 
 ```
 # sequences.txt
@@ -33,6 +34,21 @@ files list codepoints, so you can paste directly from there.
 200D 1F600                   ; malformed: starts with a joiner
 1F44D 1F3FB                  ; thumbs up, light skin tone
 2764 1F3FB                   ; malformed: heart isn't a modifier base
+```
+
+With `--format text`, each line is raw UTF-8 emoji text instead of hex
+codepoints - each Unicode scalar value on the line becomes one codepoint of
+the sequence. This is for pasting actual emoji straight from a chat client
+or a sticker pack's source file, rather than transcribing codepoints by
+hand. In this mode only `;` starts a comment, not `#`, since `#` is itself a
+valid keycap base character (`#️⃣`):
+
+```
+$ printf '%s\n' '👋' '👩‍💻' '#️⃣' | emojiseq --format text
+ok   1F44B
+ok   1F469 200D 1F4BB
+ok   0023 FE0F 20E3
+3 ok, 0 bad
 ```
 
 ## Usage
